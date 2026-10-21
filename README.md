@@ -1,28 +1,42 @@
-<p align="center">
-  <img src="https://github.com/openpeeps/PKG/blob/main/.github/logo.png" width="90px"><br>
-  OpenPeeps repository template for developing libraries,<br>projects and other cool things. 👑 Written in Nim language
-</p>
+# stdkups
 
-<p align="center">
-  <code>nimble install {PKG}</code>
-</p>
+dfkup's standard library as a nimble package. Every `std/<name>` module
+(except `system`, which stays statically linked in the dfkup host binary)
+lives here as `stdkups/lib<name>` and ships to users as a
+`libdfkup_<name>` dylib shard loaded on first `import "std/<name>"`.
 
-<p align="center">
-  <a href="https://openpeeps.github.io/{pkg}">API reference</a><br>
-  <img src="https://github.com/openpeeps/pistachio/workflows/test/badge.svg" alt="Github Actions">  <img src="https://github.com/openpeeps/pistachio/workflows/docs/badge.svg" alt="Github Actions">
-</p>
+## Layout
 
-## 😍 Key Features
-- [x] Open Source | `MIT` License
-- [x] Written in Nim language
+- `src/stdkups/` — the 30 shard modules plus `compileutils.nim`
+  (shared `compileCode` helper, re-exported by dfkup's `libsystem`).
+- `src/stdkups.nim` — package root (documentation only).
+- `tools/stdlib_plugin.tmpl` — dylib wrapper template.
+- `tools/build_shards.py` — shard build script (workflow entry point).
+- `tests/test_modules.nim` — compile check for every module.
 
-## Examples
-...
+## Building shards
 
-### ❤ Contributions & Support
-- 🐛 Found a bug? [Create a new Issue](https://github.com/openpeeps/pistachio/issues)
-- 👋 Wanna help? [Fork it!](https://github.com/openpeeps/pistachio/fork)
+Shards are built at workflow level (no nimble task). The build needs a
+dfkup checkout for the host sources (`lang/transformers`,
+`lang/parser`):
 
-### 🎩 License
-MIT license. [Made by Humans from OpenPeeps](https://github.com/openpeeps).<br>
-Copyright OpenPeeps & Contributors &mdash; All rights reserved.
+```sh
+python3 tools/build_shards.py --dfkup-src ../dfkup --out ../dfkup/bin/stdlib
+```
+
+`--lock` points at a `clue.lock` with resolved dependency paths
+(dfkup's lock when run from dfkup CI, the package's own lock here).
+
+## Notes
+
+- Plain `import stdkups/lib<name>` needs no host sources, except
+  `libllm` (via `compileutils`, which uses the host's `lang/parser`).
+  `tests/test_modules.nim` therefore covers the 29 host-independent
+  modules; `libllm` is compile-verified by the shard build itself.
+- Heap contract: shards and host share `--threads:on --mm:arc`
+  (see `tools/build_shards.py`); exceptions never cross the dylib
+  boundary (in-image guard re-raises through the host sink).
+
+## License
+
+MIT license. Made by Humans from OpenPeeps.
