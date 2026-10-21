@@ -6,13 +6,13 @@ jobs:
     with:
       nim-version: stable
       os: '[{"os":"ubuntu-latest"},{"os":"macos-latest"}]'
-      # Shard wrappers import the host's lang/transformers (and libllm
-      # needs lang/parser), so the dfkup checkout must exist at build
-      # time. Only `--path`s are used; dfkup is never a package dep.
+      # The dfkup sources come from the published package, not a
+      # checkout: `clue install dfkup --build` installs and builds it,
+      # and the shard builder resolves its path through clue
+      # (develop checkout wins locally, registry install in CI).
       pre-install-command: |
-        git clone --depth 1 https://github.com/dfkup/dfkup.git /tmp/dfkup
+        clue install dfkup --build
       # Build every shard (compile-verifies all 30 modules, including
       # libllm) before `clue test` runs the package's own test suite.
       pre-test-command: |
-        PYBIN="$(command -v python3 || command -v python)"
-        "$PYBIN" tools/build_shards.py --dfkup-src /tmp/dfkup --out dist/shards
+        nim c --hints:off --verbosity:0 -r tools/build_shards.nim --out=dist/shards

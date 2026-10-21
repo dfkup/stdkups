@@ -3,6 +3,9 @@ nimcache/
 nimblecache/
 htmldocs/
 testresults/
+# `nim c -r tools/build_shards.nim` drops its binary next to the source
+tools/build_shards
+tools/build_shards.exe
 /tests/*
 !/tests/*.nim
 !/tests/*.nims

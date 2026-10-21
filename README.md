@@ -11,17 +11,19 @@ lives here as `stdkups/lib<name>` and ships to users as a
   (shared `compileCode` helper, re-exported by dfkup's `libsystem`).
 - `src/stdkups.nim` — package root (documentation only).
 - `tools/stdlib_plugin.tmpl` — dylib wrapper template.
-- `tools/build_shards.py` — shard build script (workflow entry point).
+- `tools/build_shards.nim` — dylib shard builder (workflow entry point).
 - `tests/test_modules.nim` — compile check for every module.
 
-## Building shards
+## Build Standard Library
 
-Shards are built at workflow level (no nimble task). The build needs a
-dfkup checkout for the host sources (`lang/transformers`,
-`lang/parser`):
+Shards are built at workflow level (no nimble task). The build needs the
+dfkup sources (`lang/transformers`, `lang/parser`); `build_shards`
+finds them via `--dfkup-src`, a nearby checkout, or the dfkup package
+itself (`clue install dfkup --build`). Plain `nim c -r`, std-only
+imports:
 
 ```sh
-python3 tools/build_shards.py --dfkup-src ../dfkup --out ../dfkup/bin/stdlib
+nim c -r tools/build_shards.nim --dfkup-src ../dfkup --out ../dfkup/bin/stdlib
 ```
 
 `--lock` points at a `clue.lock` with resolved dependency paths
@@ -34,7 +36,7 @@ python3 tools/build_shards.py --dfkup-src ../dfkup --out ../dfkup/bin/stdlib
   `tests/test_modules.nim` therefore covers the 29 host-independent
   modules; `libllm` is compile-verified by the shard build itself.
 - Heap contract: shards and host share `--threads:on --mm:arc`
-  (see `tools/build_shards.py`); exceptions never cross the dylib
+  (see `tools/build_shards.nim`); exceptions never cross the dylib
   boundary (in-image guard re-raises through the host sink).
 
 ## License

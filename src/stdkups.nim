@@ -9,7 +9,7 @@
 ## Every `std/<name>` module (except `system`, which stays statically
 ## linked in the dfkup host binary) lives here as `stdkups/lib<name>`
 ## and ships to users as a `libdfkup_<name>` dylib shard built with
-## `tools/build_shards.py` (invoked from the GitHub workflows, which
+## `tools/build_shards.nim` (invoked from the GitHub workflows, which
 ## also supply `--dfkup-src` for the host sources the wrappers need).
 ##
 ## Import submodules directly, e.g. `import stdkups/libjson`.
