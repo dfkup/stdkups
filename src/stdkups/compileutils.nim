@@ -6,11 +6,10 @@
 
 ## Shared helpers for stdkups shard modules.
 ##
-## `compileCode` used to live in dfkup's `libsystem`; it moved here so the
-## `llm` shard (which compiles its coroutine helpers from dfkup source at
-## init time) has no compile-time dependency on the host binary package.
-## dfkup's `libsystem` re-exports it, so `libsystem.compileCode` keeps
-## working for existing consumers.
+## `compileCode` parses and compiles inline dfkup source at init time for
+## the `llm` shard's coroutine helpers. dfkup carries its own independent
+## copy (`src/lang/compileutils.nim`, used by `libsystem`); the two are
+## deliberately duplicated so neither package depends on the other.
 
 import std/options
 import pkg/vancode/interpreter/[ast, codegen, chunk, sym, value]

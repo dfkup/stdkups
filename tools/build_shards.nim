@@ -8,10 +8,10 @@
 ##   nim c -r tools/build_shards.nim --stdkups=. --dfkup-src=../dfkup \
 ##     --out=../dfkup/bin/stdlib
 ##
-## Dependency `--path`s resolve from an optional clue JSON lock; without
-## one (CI runners never have it) they resolve from stdkups.nimble via
-## ~/.clue/develop, then ~/.clue/packages. The dfkup sources resolve
-## from --dfkup-src, a nearby checkout, or the dfkup package itself
+## Dependency `--path`s resolve from an optional clue JSON lock (the
+## stdkups checkout's own, never the invoker's); without one they
+## resolve from stdkups.nimble, transitively, via ~/.clue/develop,
+## then ~/.clue/packages. The dfkup sources resolve from --dfkup-src, a nearby checkout, or the dfkup package itself
 ## (`clue install dfkup --build`).
 
 import std/[json, os, osproc, strutils]
@@ -150,9 +150,9 @@ proc nimbleSrcDir(nimbleFile: string): string =
     discard
   "src"
 
-proc resolveDep(name, op, want, clueHome: string): string =
-  ## Host src dir for one dependency: develop checkout first (live
-  ## sources, matches local dev), else the newest registry install
+proc depRootAndSrc(name, op, want, clueHome: string): tuple[root, src: string] =
+  ## Package root + src dir for one dependency: develop checkout first
+  ## (live sources, matches local dev), else the newest registry install
   ## satisfying the constraint (matches CI, where only the registry
   ## exists).
   let dev = clueHome / "develop" / name
@@ -160,9 +160,9 @@ proc resolveDep(name, op, want, clueHome: string): string =
     let real = expandSymlink(dev)
     let src = real / nimbleSrcDir(real / name & ".nimble")
     if dirExists(src):
-      return src
+      return (real, src)
     if dirExists(real):
-      return real
+      return (real, real)
   let pkgdir = clueHome / "packages" / name
   var best = ""
   if dirExists(pkgdir):
@@ -179,9 +179,35 @@ proc resolveDep(name, op, want, clueHome: string): string =
   let root = pkgdir / best
   let src = root / nimbleSrcDir(root / name & ".nimble")
   if dirExists(src):
-    src
+    (root, src)
   else:
-    root
+    (root, root)
+
+proc resolveDep(name, op, want, clueHome: string): string =
+  depRootAndSrc(name, op, want, clueHome).src
+
+proc addDepPaths(name, op, want, clueHome: string,
+                 paths: var seq[string], seen: var seq[string]) =
+  ## `--path` for one dep plus its transitive closure: each package's
+  ## own nimble requires are recursed with their own constraints.
+  ## Without this only direct deps land on `--path` and shards fail on
+  ## second-level imports (e.g. powpow's `multipart`). `seen` guards
+  ## dependency cycles.
+  if name in seen:
+    return
+  seen.add(name)
+  # `dfkup` is excluded from the dep --paths: the host sources always
+  # come from the explicit dfkup path (see main), so a registry copy
+  # can never shadow the intended checkout earlier on --path order.
+  if name == "dfkup":
+    return
+  let (root, src) = depRootAndSrc(name, op, want, clueHome)
+  if src notin paths:
+    paths.add(src)
+  let nimbleF = root / name & ".nimble"
+  if fileExists(nimbleF):
+    for r in parseRequires(nimbleF):
+      addDepPaths(r.name, r.op, r.want, clueHome, paths, seen)
 
 proc lockPaths(lockFile: string): tuple[paths: seq[string], nimVersion: string] =
   ## Dep src paths + nimVersion from a clue JSON lock (dfkup still
@@ -290,8 +316,16 @@ proc main() =
     quit("template not found: " & tmplFile)
   let tmpl = readFile(tmplFile)
 
-  if lockFile.len == 0 and fileExists("clue.lock"):
-    lockFile = "clue.lock"
+  # Shard dependencies come from stdkups, so only a stdkups lock is
+  # valid here — never the CWD lock of a dfkup checkout invoking the
+  # builder with an explicit --stdkups (dfkup has no `requires
+  # "stdkups"`, so its lock no longer carries the shard deps and would
+  # shadow them with an incomplete --path set).
+  if lockFile.len == 0:
+    if stdkupsDir.len > 0 and fileExists(stdkupsDir / "clue.lock"):
+      lockFile = stdkupsDir / "clue.lock"
+    elif stdkupsDir.len == 0 and fileExists("clue.lock"):
+      lockFile = "clue.lock"
   var paths: seq[string] = @[]
   var nimVersion = ""
   if lockFile.len > 0:
@@ -299,14 +333,14 @@ proc main() =
     if paths.len == 0:
       quit(lockFile & " has no package paths; run `clue install` first")
   else:
-    # No lock (CI runners never have one): resolve the shard deps
-    # from the nimble requirements, develop checkouts first.
+    # No lock (CI runners may not have one): resolve the shard deps
+    # from the nimble requirements, transitively, develop checkouts
+    # first.
     let nimbleF = if nimbleFile.len > 0: nimbleFile
                   else: stdkupsDir / "stdkups.nimble"
+    var seen: seq[string] = @[]
     for r in parseRequires(nimbleF):
-      let p = resolveDep(r.name, r.op, r.want, clueHome)
-      if p notin paths:
-        paths.add(p)
+      addDepPaths(r.name, r.op, r.want, clueHome, paths, seen)
   if paths.len == 0:
     quit("no dependency paths resolved; run `clue install` first")
   let nimExe = findNim(nimVersion)

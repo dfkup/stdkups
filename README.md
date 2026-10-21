@@ -8,11 +8,15 @@ lives here as `stdkups/lib<name>` and ships to users as a
 ## Layout
 
 - `src/stdkups/` — the 30 shard modules plus `compileutils.nim`
-  (shared `compileCode` helper, re-exported by dfkup's `libsystem`).
+  (its own `compileCode` copy; dfkup carries an independent one in
+  `src/lang/compileutils.nim`, so neither package depends on the other).
 - `src/stdkups.nim` — package root (documentation only).
 - `tools/stdlib_plugin.tmpl` — dylib wrapper template.
 - `tools/build_shards.nim` — dylib shard builder (workflow entry point).
-- `tests/test_modules.nim` — compile check for every module.
+- `tests/` — `test_modules.nim` compile check plus the shard test suite
+  (moved from the dfkup repo; tests exercise shards against the host
+  interpreter via `lang/...` imports, with dfkup's sources on `--path`
+  from the `dfkup` package requirement).
 
 ## Build Standard Library
 
@@ -27,7 +31,10 @@ nim c -r tools/build_shards.nim --dfkup-src ../dfkup --out ../dfkup/bin/stdlib
 ```
 
 `--lock` points at a `clue.lock` with resolved dependency paths
-(dfkup's lock when run from dfkup CI, the package's own lock here).
+(the checkout's own lock when present). Without one, the builder
+resolves `stdkups.nimble` transitively through the clue store
+(`~/.clue/develop`, then `~/.clue/packages`) — no lock file needed,
+but the packages must be installed (`clue install --depsOnly`).
 
 ## Notes
 

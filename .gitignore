@@ -1,4 +1,5 @@
 .DS_Store
+clue.lock
 nimcache/
 nimblecache/
 htmldocs/
@@ -9,3 +10,5 @@ tools/build_shards.exe
 /tests/*
 !/tests/*.nim
 !/tests/*.nims
+!/tests/fixtures/
+!/tests/fixtures/*

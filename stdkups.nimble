@@ -25,3 +25,8 @@ requires "powpow >= 0.2.2"
 requires "chopchop >= 0.1.0"
 requires "chachachat >= 0.1.0"
 requires "bigints >= 1.0.0"
+# Host sources for the shard build and the test suite: shard wrappers
+# import dfkup's `lang/transformers` (via --path, never as a package),
+# and the tests exercise shards against the host interpreter. This is
+# one-directional — dfkup has no dependency on stdkups.
+requires "dfkup >= 0.1.0"
