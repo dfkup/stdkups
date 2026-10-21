@@ -17,7 +17,7 @@ requires "openparser >= 0.3.10"
 # are compiled. No shard module imports it directly.
 requires "voodoo >= 0.2.3"
 requires "marvdown >= 0.2.4"
-requires "supranim#HEAD"
+requires "supranim"
 requires "blackpaper >= 0.2.0"
 requires "nimcypher >= 0.2.5"
 requires "twofa >= 0.1.0"
