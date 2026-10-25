@@ -15,4 +15,5 @@ jobs:
       # Build every shard (compile-verifies all 30 modules, including
       # libllm) before `clue test` runs the package's own test suite.
       pre-test-command: |
-        nim c --hints:off --verbosity:0 -r tools/build_shards.nim --out=dist/shards
+        clue build tools/build_shards.nim -o /tmp/build_shards &&
+        /tmp/build_shards --out=dist/shards
