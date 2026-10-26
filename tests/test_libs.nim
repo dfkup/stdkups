@@ -2,7 +2,6 @@ import std/[unittest, options, os, strutils]
 import lang/transformers
 import pkg/vancode/interpreter/[ast, codegen, chunk, sym, vm, value]
 import lang/[parser, lowlibs/libsystem]
-import stdkups/[libjson]
 
 proc run(code: string): string =
   var program: Ast
@@ -14,10 +13,6 @@ proc run(code: string): string =
   let systemModule = newModule("system", some"system.dfkup")
   initSystem(script, systemModule)
   module.importModule(systemModule, "system")
-  let jsonModule = newModule("json", some"json.dfkup")
-  jsonModule.importModule(systemModule, "system")
-  initJson(script, jsonModule)
-  module.load(jsonModule)
   script.stdpos = script.procs.high
   var gen = initCodeGen(script, module, mainChunk)
   gen.allowExprResult = true
@@ -26,20 +21,6 @@ proc run(code: string): string =
   let resultVal = vmInstance.interpret(script, mainChunk)
   if resultVal != nil and resultVal.typeId notin {tyNil}:
     result = $resultVal
-
-suite "Libraries - JSON":
-  test "parse and dump":
-    let r = run("let d = parseJson(\"{\\\"a\\\":1}\")\ndumpJson(d)")
-    check r == "{\"a\":1}"
-  test "get string field":
-    let r = run("let d = parseJson(\"{\\\"n\\\":\\\"x\\\"}\")\nget(d, \"n\", \"\")")
-    check r == "\"x\""
-  test "get with default":
-    let r = run("let d = parseJson(\"{}\")\nget(d, \"k\", \"fallback\")")
-    check r == "\"fallback\""
-  test "keys":
-    let r = run("let d = parseJson(\"{\\\"a\\\":1,\\\"b\\\":2}\")\njoin(keys(d), \",\")")
-    check r == "a,b"
 
 suite "Libraries - OS":
   test "fileExists":

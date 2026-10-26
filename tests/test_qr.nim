@@ -2,8 +2,8 @@ import std/[unittest, options, strutils, os]
 import lang/transformers
 import pkg/vancode/interpreter/[ast, codegen, chunk, sym, vm, value]
 import pkg/openparser/qr
-import lang/[parser, lowlibs/libsystem]
-import stdkups/[libjson, libqr]
+import lang/[parser, lowlibs/libsystem, lowlibs/libjson]
+import stdkups/[libqr]
 
 proc interpret(code: string): Value =
   var program: Ast

@@ -20,13 +20,9 @@ import stdkups/libfswatch
 import stdkups/libhttp
 import stdkups/libhttpclient
 import stdkups/libical
-import stdkups/libjson
 import stdkups/libmarkdown
 import stdkups/libnanoid
 import stdkups/libqr
-import stdkups/libregex
-import stdkups/libsequtils
-import stdkups/libstrings
 import stdkups/libstrongpwd
 import stdkups/libsvg
 import stdkups/libtoml

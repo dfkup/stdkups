@@ -1,8 +1,7 @@
 import std/[unittest, options]
 import lang/transformers
 import pkg/vancode/interpreter/[ast, codegen, chunk, sym, vm, value]
-import lang/[parser, lowlibs/libsystem]
-import stdkups/[libregex]
+import lang/[parser, lowlibs/libsystem, lowlibs/libregex]
 
 proc run(code: string): string =
   var program: Ast

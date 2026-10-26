@@ -17,20 +17,25 @@
 import std/[json, os, osproc, strutils]
 
 # (shard name, lowlib module, init proc). Mirrors
-# dfkup `stdlib_loader.dfkupStdlibNames` (minus `system`, which stays
-# statically linked in the host binary).
+# dfkup `stdlib_loader.dfkupStdlibNames` minus the five lowlibs that
+# dfkup links into the host binary itself
+# (`system`, `json`, `strings`, `sequtils`, `regex`).
 const stdlibMap = [
-  ("json", "libjson", "initJson"),
+  ("date", "libdate", "initDate"),
+  ("locale", "liblocale", "initLocale"),
+  ("vcard", "libvcard", "initVcard"),
+  ("plist", "libplist", "initPlist"),
+  ("fuzzy", "libfuzzy", "initFuzzy"),
+  ("diff", "libdiff", "initDiff"),
+  ("html", "libhtml", "initHtml"),
+  ("path", "libpath", "initPath"),
   ("httpclient", "libhttpclient", "initHttpClient"),
   ("http", "libhttp", "initHttp"),
   ("fswatch", "libfswatch", "initFswatch"),
   ("browser", "libbrowser", "initBrowser"),
   ("yaml", "libyaml", "initYaml"),
-  ("strings", "libstrings", "initStrings"),
-  ("sequtils", "libsequtils", "initSequtils"),
   ("cli", "libcli", "initCliLib"),
   ("config", "libconfig", "initConfig"),
-  ("regex", "libregex", "initRegex"),
   ("toml", "libtoml", "initToml"),
   ("uuid", "libuuid", "initUuid"),
   ("dotenv", "libdotenv", "initDotenv"),

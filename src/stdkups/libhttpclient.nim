@@ -228,8 +228,9 @@ proc initHttpClient*(script: Script, module: Module) =
   #
 
   # The verbs are prefixed: `get`, `delete` and `status` already exist in
-  # libjson/libstrings/libsystem, and since every stdlib module shares one
-  # namespace an unprefixed `get(client, url)` would resolve to json's `get`.
+  # dfkup's lowlibs (json/strings) and libsystem, and since every stdlib
+  # module shares one namespace an unprefixed `get(client, url)` would
+  # resolve to json's `get`.
   script.addProc(module, "httpRequest",
     params = @[paramDef("client", ttyPointer), paramDef("method", ttyString),
                paramDef("url", ttyString),
