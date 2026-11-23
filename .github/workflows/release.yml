@@ -1,0 +1,159 @@
+name: release
+on:
+  push:
+    tags: ['*.*.*']
+  workflow_dispatch:
+jobs:
+  build:
+    name: shards (${{ matrix.os }}-${{ matrix.arch }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - {os: ubuntu-latest, arch: x86_64}
+          - {os: ubuntu-24.04-arm, arch: arm64}
+          - {os: macos-15, arch: arm64}
+          - {os: macos-15-intel, arch: x86_64}
+          - {os: windows-latest, arch: x86_64}
+          - {os: windows-11-arm, arch: arm64}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Nim
+        uses: nimbase/setup-nim-action@main
+        with:
+          # Pinned: dfkup's release pins the same version, and its loader
+          # rejects shards built with another Nim version.
+          nim-version: '2.4.0'
+
+      - name: Install clue
+        shell: bash
+        run: |
+          set -eu
+          os="${{ runner.os }}"
+          arch="${{ runner.arch }}"
+          case "${os}" in
+            Linux)
+              case "${arch}" in
+                X64)   asset="clue_linux-x86_64"; ext="tar.gz" ;;
+                ARM64) asset="clue_linux-arm64";  ext="tar.gz" ;;
+                *)     echo "ERROR: unsupported Linux arch: ${arch}"; exit 1 ;;
+              esac
+              ;;
+            macOS)
+              case "${arch}" in
+                X64)   asset="clue_macos-x86_64"; ext="tar.gz" ;;
+                ARM64) asset="clue_macos-arm64";  ext="tar.gz" ;;
+                *)     echo "ERROR: unsupported macOS arch: ${arch}"; exit 1 ;;
+              esac
+              ;;
+            Windows)
+              case "${arch}" in
+                X64)   asset="clue_windows-x86_64"; ext="zip" ;;
+                ARM64) asset="clue_windows-arm64";  ext="zip" ;;
+                *)     echo "ERROR: unsupported Windows arch: ${arch}"; exit 1 ;;
+              esac
+              ;;
+            *)
+              echo "ERROR: unsupported os: ${os}"; exit 1 ;;
+          esac
+
+          url="https://github.com/openpeeps/clue/releases/latest/download/${asset}.${ext}"
+          echo ">> downloading ${url}"
+          work="$(mktemp -d)"
+          trap 'rm -rf "$work"' EXIT
+          curl -fsSL "${url}" -o "${work}/clue.${ext}"
+
+          if [[ "${ext}" == "zip" ]]; then
+            win_zip="$(cygpath -w "${work}/clue.zip")"
+            win_dest="$(cygpath -w "${work}")"
+            powershell -NoProfile -Command "Expand-Archive -Force -LiteralPath '${win_zip}' -DestinationPath '${win_dest}'"
+          else
+            tar xzf "${work}/clue.${ext}" -C "${work}"
+          fi
+
+          bin="$(find "${work}" -type f \( -name 'clue' -o -name 'clue.exe' \) | head -n 1)"
+          [[ -n "${bin}" ]] || { echo "ERROR: clue binary not found in archive"; exit 1; }
+          chmod +x "${bin}"
+          mkdir -p "$HOME/.clue/bin"
+          target="$HOME/.clue/bin/clue"
+          if [[ "${os}" == "Windows" ]]; then
+            target="${target}.exe"
+          fi
+          install -m 0755 "${bin}" "${target}"
+          echo "installed clue: ${target}"
+          echo "$HOME/.clue/bin" >> "$GITHUB_PATH"
+
+      - name: Install OpenSSL (macOS)
+        if: runner.os == 'macOS'
+        shell: bash
+        run: |
+          set -eu
+          # macOS no longer ships a linkable system libssl (removed from the
+          # SDK), so install the keg-only Homebrew OpenSSL and wire it up.
+          brew list openssl@3 >/dev/null 2>&1 || brew install openssl@3
+          prefix="$(brew --prefix)/opt/openssl@3"
+          mkdir -p "$HOME/.config/nim"
+          cfg="$HOME/.config/nim/nim.cfg"
+          if [[ ! -f "${cfg}" ]] || ! grep -q "openssl@3" "${cfg}"; then
+            printf -- '--passL:"-L%s/lib"\n--passC:"-I%s/include"\n' "${prefix}" "${prefix}" >> "${cfg}"
+          fi
+          if [[ "$(uname -m)" == "arm64" ]] && ! grep -q -- "-arch arm64" "${cfg}"; then
+            printf -- '--passC:"-arch arm64"\n--passL:"-arch arm64"\n' >> "${cfg}"
+          fi
+
+      - name: Install dependencies
+        shell: bash
+        run: |
+          # Own shard deps, plus the dfkup host sources (the shard builder
+          # resolves them through clue: develop checkout wins locally,
+          # registry install in CI).
+          clue install
+          clue install dfkup --build
+
+      - name: Build shards
+        shell: bash
+        run: |
+          clue build tools/build_shards.nim -o /tmp/build_shards &&
+          /tmp/build_shards --out=libraries
+
+      - name: Package shards
+        shell: bash
+        run: |
+          set -eu
+          suffix="$(echo "${RUNNER_OS}-${RUNNER_ARCH}" | tr '[:upper:]' '[:lower:]')"
+          tar czf "stdlib_${suffix}.tar.gz" libraries
+          ls -la "stdlib_${suffix}.tar.gz"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: stdlib-${{ matrix.os }}-${{ matrix.arch }}
+          path: stdlib_*.tar.gz
+
+  release:
+    name: Release
+    runs-on: ubuntu-latest
+    needs: build
+    if: github.ref_type == 'tag'
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: stdlib-*
+          path: dist
+          merge-multiple: true
+
+      - name: Create GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -eu
+          tag="${{ github.ref_name }}"
+          gh release create "${tag}" --title "${tag}" --generate-notes dist/*.tar.gz
